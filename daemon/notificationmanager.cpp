@@ -115,12 +115,6 @@ uint NotificationManager::Notify(const QString &app_name, uint replaces_id, cons
     // new place to check notification owner in Sailfish 1.1.6
     QString owner = hints.value("x-nemo-owner", "none").toString();
 
-    // Ignore transient notifcations
-    if (hints.value("transient", false).toBool()) {
-        qCDebug(l) << "Ignoring transient notification from " << owner;
-        return 0;
-    }
-
     qCDebug(l) << Q_FUNC_INFO  << "Got notification via dbus from" << this->getCleanAppName(app_name) << " Owner: " << owner;
     qCDebug(l) << hints;
 
@@ -129,6 +123,15 @@ uint NotificationManager::Notify(const QString &app_name, uint replaces_id, cons
     Q_ASSERT(calledFromDBus());
     setDelayedReply(true);
 
+    QString category = hints.value("category", "").toString();
+    QStringHash categoryParams = this->getCategoryParams(category);
+
+    // Ignore transient notifications
+    if (!category.endsWith("preview") && categoryParams.value("transient", "false") == "true") {
+        qCDebug(l) << "Ignoring transient notification from " << owner;
+        return 0;
+    }
+    
     if (app_name == "messageserver5" || owner == "messageserver5") {
         if (!settings->property("notificationsEmails").toBool()) {
             qCDebug(l) << "Ignoring email notification because of setting!";
@@ -149,8 +152,6 @@ uint NotificationManager::Notify(const QString &app_name, uint replaces_id, cons
         }
     } else if (app_name == "commhistoryd" || owner == "commhistoryd") {
         if (summary == "" && body == "") {
-            QString category = hints.value("category", "").toString();
-
             if (category == "x-nemo.call.missed") {
                 if (!settings->property("notificationsMissedCall").toBool()) {
                     qCDebug(l) << "Ignoring MissedCall notification because of setting!";
@@ -188,8 +189,6 @@ uint NotificationManager::Notify(const QString &app_name, uint replaces_id, cons
         // Prioritize x-nemo-preview* over dbus direct summary and body
         QString subject = hints.value("x-nemo-preview-summary", "").toString();
         QString data = hints.value("x-nemo-preview-body", "").toString();
-        QString category = hints.value("category", "").toString();
-        QStringHash categoryParams = this->getCategoryParams(category);
         int prio = categoryParams.value("x-nemo-priority", "0").toInt();
 
         qCDebug(l) << "MSG Prio:" << prio;
